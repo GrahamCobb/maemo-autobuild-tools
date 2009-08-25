@@ -36,7 +36,7 @@ then
   SCRIPTS=`pwd`/$SCRIPTS
 fi
 
-for pkg in `./expand-package-names "$@"`
+for pkg in `$SCRIPTS/expand-package-names "$@"`
 do
     file=packages/$pkg.xml
     echo "editing $file"

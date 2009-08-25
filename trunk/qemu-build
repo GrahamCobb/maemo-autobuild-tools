@@ -1,0 +1,373 @@
+#!/bin/bash
+#
+# qemu-build <packages>...
+#
+# <packages> should be a list of package names
+#
+# Note that some package names are special:
+#
+#  GPE - this is turned into the list of packages that make up GPE
+#
+# Options:
+#
+#   --dir <target>
+#
+#     target subdirectory of ~/v/sb-qemu/ to use for log and upload/
+#
+#     default is to use ~/v/sb-qemu itself
+#
+#   --release <release>
+#
+#     release version id.  Default is to leave it unchanged in the package files
+#
+#     <release> should be a release number in form <major>.<minor>-<debian-version>
+#     or <major>.<minor>+ (the latter indicates the date should be included in the package version)
+#
+#   --date <date>
+#
+#     date to use for SVN fetches.  Default is "now"
+#
+#   --repo <address> <distribution> <component>
+#
+#     repository information to add to apt sources list
+#
+#     Note that this option must be followed by exactly three arguments.
+#     This option can be specified more than once.  Each repository is added as two lines:
+#
+#     deb <address> <distribution> <component>
+#     deb-src <address> <distribution> <component>
+#
+#   --install <package>
+#
+#     install a package before starting the build
+#
+#     The package is installed using "apt-get install <package>".  The build continues
+#     if the installation fails.
+#
+#     This option can be specified more than once.
+#
+#   --expected <number>
+#
+#     expected number of .deb's.  If this is specified, the script will
+#     check for the expected number and, if so, will create a file called
+#     'completed' in the upload directory.
+#
+#   --quiet
+#
+#     do not show build log on stdout.  This is useful when building in cron
+#     so the mail is not multi-megabytes!  Note that the build summary information
+#     is still displayed.
+#
+#   --clean
+#
+#     remove previously installed packages.  This is useful when not building in
+#     a clean environment and building a version earlier than previously built versions.
+#
+#   --sdk <codename>
+#
+#     specify codename for sdk, to pass to MUD.
+#
+#   --cont
+#
+#     continue a previous build
+#     Note: the caller is responsible for having saved the ~/mud-builder/upload
+#     directory if they want it, before calling this.  This option causes:
+#     1) do not empty the target directory upload directory
+#     2) install all packages lying around in mud-builder/upload
+#     3) invokes mud with the --depend-nobuild option
+#
+#   --dont-copy (must be first option)
+#
+#     do not copy the script and exec the copy.  Not normally specified by hand,
+#     this option is used internally once the copy has happened
+#
+# The upload directory is emptied and the packages are built using the specified date
+#
+# NOTE: must be in scratchbox environment
+#
+
+if [ "$1" != "--dont-copy" ]
+then
+    echo Copying script...
+    cp ~/v/qemu-build ~/
+    exec ~/qemu-build --dont-copy "$@"
+else
+    shift
+fi
+
+# Save qemu output
+fifo=`tempfile`
+rm $fifo
+mkfifo $fifo
+( tee <$fifo ~/v/sb-qemu/qemu-build-itself.log ; rm $fifo ) &
+exec >$fifo 2>&1
+
+echo "$0 started at `date`"
+
+target=""
+release=""
+date="now"
+cont=""
+expected=0
+quiet=0
+declare -a repos
+install=""
+clean=0
+sdk=""
+while [ "${1:0:1}" = "-" ]
+do
+  if [ "$1" = "--dir" ]
+      then
+      target="/$2"
+      mkdir ~/v/sb-qemu$target
+      shift 2
+  elif [ "$1" = "--release" ]
+      then
+      release="$2"
+      shift 2
+  elif [ "$1" = "--date" ]
+      then
+      date="$2"
+      shift 2
+  elif [ "$1" = "--expected" ]
+      then
+      expected="$2"
+      shift 2
+  elif [ "$1" = "--quiet" ]
+      then
+      quiet=1
+      shift
+  elif [ "$1" = "--clean" ]
+      then
+      clean=1
+      shift
+  elif [ "$1" = "--cont" ]
+      then
+      cont="--depend-nobuild"
+      shift
+  elif [ "$1" = "--repo" ]
+      then
+      # repos is an array, so append to it
+      repos=("${repos[@]}" "$2 $3 $4")
+      shift 4
+  elif [ "$1" = "--install" ]
+      then
+      install="$install $2"
+      shift 2
+  elif [ "$1" = "--sdk" ]
+      then
+      sdk="--sdk $2"
+      shift 2
+  else
+      echo "$0: Unrecognised option: $1"
+      exit 1
+  fi
+done
+
+#
+# Allow unauthenticated installations:
+#
+echo "APT::Get::AllowUnauthenticated 1 ;" >>/etc/apt/apt.conf
+
+#
+# Add additional repositories
+#
+for r in "${repos[@]}"
+  do
+  if ! grep -F "$r" /etc/apt/sources.list >/dev/null 2>&1
+  then
+    echo "Adding $r to apt sources"
+    echo "deb $r" >>/etc/apt/sources.list
+    echo "deb-src $r" >>/etc/apt/sources.list
+  else
+    echo "apt sources already contains $r"
+  fi
+done
+
+fakeroot apt-get update --quiet --quiet
+
+#
+# Install additional packages
+#
+fakeroot apt-get --yes -f install
+if [ -n "$install" ]
+then
+  for p in "$install"
+    do
+    echo "Installing $p..."
+    fakeroot apt-get --yes install $p
+  done
+fi
+fakeroot apt-get --yes install subversion
+fakeroot apt-get --yes install build-essential
+fakeroot apt-get --yes install devscripts
+fakeroot apt-get --yes install xsltproc
+fakeroot apt-get --yes install sharutils
+
+#
+# Create mud-builder directory
+#
+if [ -z "$cont" ]
+then
+    [ -d ~/mud-builder ] && rm -rf ~/mud-builder
+fi
+mkdir -p ~/.subversion/auth/svn.ssl.server
+# Authorise certificate for SVN (this tends to expire around March/April each year)
+cat <<EOF >~/.subversion/auth/svn.ssl.server/59ffbb8064591299582e5251f3a8e4db
+K 10
+ascii_cert
+V 1400
+MIIEFDCCA32gAwIBAgIQJtMT72bCQgXG8ADZSLuJ/jANBgkqhkiG9w0BAQUFADCBujEfMB0GA1UEChMWVmVyaVNpZ24gVHJ1c3QgTmV0d29yazEXMBUGA1UECxMOVmVyaVNpZ24sIEluYy4xMzAxBgNVBAsTKlZlcmlTaWduIEludGVybmF0aW9uYWwgU2VydmVyIENBIC0gQ2xhc3MgMzFJMEcGA1UECxNAd3d3LnZlcmlzaWduLmNvbS9DUFMgSW5jb3JwLmJ5IFJlZi4gTElBQklMSVRZIExURC4oYyk5NyBWZXJpU2lnbjAeFw0wOTAzMTEwMDAwMDBaFw0xMDA0MjMyMzU5NTlaMFgxCzAJBgNVBAYTAkZJMQ4wDAYDVQQIEwVFc3BvbzEOMAwGA1UEBxQFRXNwb28xDjAMBgNVBAoUBU5va2lhMRkwFwYDVQQDFBBnYXJhZ2UubWFlbW8ub3JnMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCzfA213Uy/roharU25m8KgljbHXQmyrv7drmj00e3aKu3uCF2QlnjacJtqCCCuhJAROcccWqNzc1DSr98lKFNGTZpucoiFcT7D5dPrgemeNeiShOib8fCnhQpKETxYr4smAc0RR7Ng47j0YMJLvIUihLC6doayOp2tbRheZbSP0wIDAQABo4IBejCCAXYwCQYDVR0TBAIwADALBgNVHQ8EBAMCBaAwRgYDVR0fBD8wPTA7oDmgN4Y1aHR0cDovL2NybC52ZXJpc2lnbi5jb20vQ2xhc3MzSW50ZXJuYXRpb25hbFNlcnZlci5jcmwwRAYDVR0gBD0wOzA5BgtghkgBhvhFAQcXAzAqMCgGCCsGAQUFBwIBFhxodHRwczovL3d3dy52ZXJpc2lnbi5jb20vcnBhMCgGA1UdJQQhMB8GCWCGSAGG+EIEAQYIKwYBBQUHAwEGCCsGAQUFBwMCMDQGCCsGAQUFBwEBBCgwJjAkBggrBgEFBQcwAYYYaHR0cDovL29jc3AudmVyaXNpZ24uY29tMG4GCCsGAQUFBwEMBGIwYKFeoFwwWjBYMFYWCWltYWdlL2dpZjAhMB8wBwYFKw4DAhoEFEtruSiWBgy70FI4mymsSweLIQUYMCYWJGh0dHA6Ly9sb2dvLnZlcmlzaWduLmNvbS92c2xvZ28xLmdpZjANBgkqhkiG9w0BAQUFAAOBgQASb/PlTXxOw0P3KbJDp6dUzdtpEQqOlhGa5cJfnFnujByWqj9JYq134rL+uPAD8traC+p+PIovwiwSruU22YLnpMQBE0qjlMdeJWGAbVBDBVRn2aU2+yASZ16N40uLURsIu/x2V71nvD+znminqNzyniVkd/U7/gy7bJ36gBp+qw==
+K 8
+failures
+V 1
+8
+K 15
+svn:realmstring
+V 28
+https://garage.maemo.org:443
+END
+EOF
+svn export --non-interactive --quiet --force https://garage.maemo.org/svn/mud-builder/trunk ~/mud-builder
+
+[ -d ~/mud-builder ] || ( echo "MUD download failed!!!!" ; exit 1 )
+
+cd ~/mud-builder
+
+#
+# Bring mud up to date
+#
+#patch -N -p0 <~/v/mud-builder/field-match.patch
+
+#
+# Package files
+#
+# We must not attempt to apply the patches twice because the
+# patches which create files will actually end up appending
+# the contents to the already created file
+[ -f packages/guile-1.8.xml ] || patch -N -p0 <~/v/mud-builder/packages.patch
+
+#
+# Copy files so things don't change during the build
+#
+cp ~/v/mud-builder/expand-package-names ~/mud-builder/
+cp ~/v/mud-builder/modify-package-dates ~/mud-builder/
+cp ~/v/mud-builder/modify-package-releases ~/mud-builder/
+#cp ~/v/mud-builder/svn-to-http ~/mud-builder/
+cp ~/v/mud-builder/full-build ~/mud-builder/
+cp ~/v/mud-builder/expected ~/mud-builder/
+
+#
+# Calculate expected number of .debs
+#
+if [ $expected -eq 0 ]
+then
+  expected=`~/mud-builder/expected "$@"`
+fi
+
+#
+# Remove old downloads
+#
+rm ~/mud-builder/downloads/*
+
+#cp ~/v/mud-builder/svn-to-http ./
+#./svn-to-http "$@"
+
+# Fixup releases
+[ -z "$release" ] || ~/mud-builder/modify-package-releases $release "$@"
+
+# Remove obsolete packages
+if [ $clean -ne 0 ]
+then
+  for p in \
+   libsqlite0-dev libsqlite0 \
+   libopencdk10-dbg libopencdk10-dev libopencdk10 \
+   libopencdk8-dbg libopencdk8-dev libopencdk8 \
+   libtasn1-3-dev libtasn1-3-dbg libtasn1-3-bin libtasn1-3 \
+   libtasn1-2-dev libtasn1-2-dbg libtasn1-2-bin libtasn1-2 \
+   libgnutls-dev libgnutls13-dbg libgnutlsxx13 libgnutls13 \
+   libgnutls-dev libgnutls11-dbg libgnutlsxx11 libgnutls11 \
+   libsoup2.2-8 libsoup2.2-dev \
+   opensync-plugin-syncml libwbxml2-dev libwbxml2-0 libsyncml-dev libsyncml0 \
+   msynctool opensync-plugin-file opensync-plugin-gpe \
+   opensync-format-plugin-vformat libopensync-dev libopensync1 \
+   gpesummary gpe-filemanager starling gpe-timesheet gpe-todo gpe-contacts gpe-calendar\
+   libhandoff-dev libhandoff0 libxsettings-client-dev libxsettings-client0 \
+   gpe-icons gpesyncd \
+   libcontactsdb-dev libcontactsdb0 libgpevtype-dev libgpevtype1 \
+   libtododb-dev libtododb0 libeventdb-dev libeventdb2 \
+   libgpepimc-dev libgpepimc0 libgpewidget-dev libgpewidget1 \
+   libmimedir-gnome-dev libmimedir-gnome0  libsoundgen-dev libsoundgen0 
+    do
+    apt-get --yes remove $p
+  done
+fi
+
+# Install previous packages
+[ -z "$cont" ] || fakeroot dpkg -i --force-depends mud-builder/upload/*.deb
+[ -z "$cont" ] || fakeroot dpkg -i --force-depends ~/v/sb-qemu$target/upload/*.deb
+
+[ -f ~/mud-builder/build/sources.list ] && rm ~/mud-builder/build/sources.list
+
+# HACK Workround bora problem
+[ -f /etc/dpkg/shlibs.override ] || touch /etc/dpkg/shlibs.override
+
+# HACK
+[ -d /scratchbox/tools/share/aclocal ] && export ACLOCAL_FLAGS="$ACLOCAL_FLAGS -I /scratchbox/tools/share/aclocal"
+compiler=`/scratchbox/tools/bin/sb-conf show -c`
+[ -d /scratchbox/compilers/$compiler/arch_tools/share/aclocal/ ] && export ACLOCAL_FLAGS="$ACLOCAL_FLAGS -I /scratchbox/compilers/$compiler/arch_tools/share/aclocal/"
+[ -d /scratchbox/devkits/doctools/share/aclocal/ ] && export ACLOCAL_FLAGS="$ACLOCAL_FLAGS -I /scratchbox/devkits/doctools/share/aclocal/"
+
+# HACK to make MUD work on GREGALE and BORA
+# Can be removed once gregale and bora are no longer being built
+function dpkg-depcheck { perl /usr/bin/dpkg-depcheck "$@" ; } ; export -f dpkg-depcheck
+
+# HACK to make dpkg-parsechangelog work on buggy systems
+# Can be removed once UML bisect is done
+#function dpkg-parsechangelog { perl $HOME/mud-builder/dpkg-parsechangelog "$@" ; } ; export -f dpkg-parsechangelog
+mkdir ~/mud-builder/pcn-hack
+cp ~/v/mud-builder/dpkg-parsechangelog ~/mud-builder/pcn-hack
+echo exit >~/mud-builder/pcn-hack/sleep
+chmod +x ~/mud-builder/pcn-hack/sleep
+export PATH=$HOME/mud-builder/pcn-hack:$PATH
+
+# HACK: check controllib
+ls -l /usr/lib/dpkg/controllib.pl
+sum /usr/lib/dpkg/controllib.pl
+fgrep Format /usr/lib/dpkg/controllib.pl
+
+mkdir -p ~/v/sb-qemu$target
+
+[ -f ~/v/sb-qemu$target/upload/completed ] && rm -f ~/v/sb-qemu$target/upload/completed
+
+# Do the build
+# LD_BIND_NOW is to workround a ld.so bug which causes program execution to sometimes fail
+#LD_BIND_NOW=1 ./full-build $cont $date "$@" 2>&1 | tee ~/v/sb-qemu$target/qemu-build.log
+~/mud-builder/full-build $sdk $cont $date "$@" 2>&1 | 
+ if [ $quiet -eq 0 ] ; then tee ~/v/sb-qemu$target/qemu-build.log ; else cat >~/v/sb-qemu$target/qemu-build.log ; fi
+
+[ -n "$cont" ] || rm ~/v/sb-qemu$target/upload/*
+mkdir ~/v/sb-qemu$target/upload
+cp upload/* ~/v/sb-qemu$target/upload/
+
+num=`ls -1 ~/v/sb-qemu$target/upload/*.deb | wc -l`
+if [ $expected -gt 0 ]
+then
+  if [ $num -ne $expected ]
+  then
+    echo "*** Build for $* failed: expected $expected packages but got $num"
+    echo "Logfile is ~/v/sb-qemu$target/qemu-build.log"
+    ls ~/v/sb-qemu$target/upload/*.deb
+    [ -f ~/v/sb-qemu$target/upload/completed ] && rm -f ~/v/sb-qemu$target/upload/completed
+  else
+    echo "Build for $* completed: found $num packages as expected"
+    touch ~/v/sb-qemu$target/upload/completed
+  fi
+else
+    echo "*** Build for $* completed: found $num packages"
+    echo "Logfile is ~/v/sb-qemu$target/qemu-build.log"
+    ls ~/v/sb-qemu$target/upload/*.deb
+    [ -f ~/v/sb-qemu$target/upload/completed ] && rm -f ~/v/sb-qemu$target/upload/completed
+fi
+
+echo "$0 finished at `date`"

@@ -21,8 +21,16 @@
 #
 #     Pass -depend-nobuild option to mud
 #
-# NOTE: must be in scratchbox environment
+# NOTE: must be in scratchbox environment and current
+# directory must be ~/mud-builder
 #
+
+# Remember where the scripts live
+export SCRIPTS=`dirname $0`
+if [ "${SCRIPTS:0:1}" != "/" -a "${SCRIPTS:0:1}" != "~" ]
+then
+  SCRIPTS=`pwd`/$SCRIPTS
+fi
 
 depend=""
 sdk=""
@@ -45,13 +53,11 @@ done
 date=`date -d "$1" +%Y%m%d`
 shift
 
-cd ~/mud-builder
-
-packages=`./expand-package-names "$@"`
+packages=`$SCRIPTS/expand-package-names "$@"`
 
 echo "Packages to be built: $packages"
 
-./modify-package-dates $date $packages
+$SCRIPTS/modify-package-dates $date $packages
 
 rm upload/*
 

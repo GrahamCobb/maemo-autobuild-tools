@@ -204,6 +204,11 @@ fakeroot apt-get --yes install sharutils
 #
 if [ -z "$cont" ]
 then
+    if [ -e ~/mud-builder/packages.patch ]
+    then
+	echo "***** Refusing to delete the MASTER mud-builder directory *****"
+	exit 999
+    fi
     [ -d ~/mud-builder ] && rm -rf ~/mud-builder
 fi
 mkdir -p ~/.subversion/auth/svn.ssl.server

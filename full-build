@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# full-build <date> <packages>...
+#
+# <date> should be a date in any form 
+# <packages> should be a list of package names
+#
+# Note that some package names are special:
+#
+#  GPE - this is turned into the list of packages that make up GPE
+#
+# The upload directory is emptied and the packages are built using the specified date
+#
+# Options:
+#
+#   --sdk <codename>
+#
+#     specify codename for sdk, to pass to MUD.
+#
+#   --depend-nobuild
+#
+#     Pass -depend-nobuild option to mud
+#
+# NOTE: must be in scratchbox environment
+#
+
+depend=""
+sdk=""
+while [ "${1:0:1}" = "-" ]
+do
+  if [ "$1" = "--depend-nobuild" ]
+      then
+      depend="--depend-nobuild"
+      shift
+  elif [ "$1" = "--sdk" ]
+      then
+      sdk="--sdk $2"
+      shift 2
+  else
+      echo "$0: Unrecognised option: $1"
+      exit 1
+  fi
+done
+
+date=`date -d "$1" +%Y%m%d`
+shift
+
+cd ~/mud-builder
+
+packages=`./expand-package-names "$@"`
+
+echo "Packages to be built: $packages"
+
+./modify-package-dates $date $packages
+
+rm upload/*
+
+echo "Build started at `date`"
+
+#echo fakeroot apt-get update
+#fakeroot apt-get update
+
+./mud clean $packages
+./mud $depend $sdk build $packages
+
+echo "Build finished at `date`"

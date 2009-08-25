@@ -1,0 +1,71 @@
+#!/bin/sh
+#
+# expand-package-names <packages>...
+#
+# <packages> should be a list of package names and/or package groups
+#
+# The output is the list of packages with any package groups expanded
+#
+# The return status is 0 if any packages were expanded, 1 if not
+#
+# Options:
+#
+#   --sync
+#
+#     Include synchronisation points in output (%sync%)
+#
+# Synchronisation points are points in the build where the subsequent
+# packages depend on the previous ones.  This does not matter for MUD but
+# is important when submitting packages to the Maemo autobuilder.
+#
+# NOTE: works inside or outside scratchbox environment
+#
+
+sync=0
+if [ "$1" = "--sync" ]
+then
+    sync=1
+    shift
+fi
+
+status=1
+packages=""
+
+for pkg
+do
+  if [ $pkg = "GPE" ]
+  then
+    packages="$packages libxsettings-client libhandoff"
+    packages="$packages gpe-icons libsoundgen libmimedir-gnome libgpewidget %sync% libgpepimc libeventdb"
+    packages="$packages %sync% libcontactsdb libtododb %sync% libgpevtype %sync% gpesyncd gpesummary"
+    packages="$packages gpe-calendar gpe-contacts gpe-todo gpe-timesheet starling gpe-filemanager"
+    status=0
+  elif [ $pkg = "opensync" ]
+  then
+    packages="$packages libopensync %sync% opensync-format-plugin-vformat opensync-format-plugin-xmlformat osynctool"
+    packages="$packages %sync% opensync-plugin-file opensync-plugin-gpe"
+    packages="$packages libwbxml2 libopenobex %sync% libsyncml"
+    packages="$packages %sync% opensync-plugin-syncml"
+  elif [ $pkg = "soup" ]
+  then
+    packages="$packages libopencdk libtasn1-3 %sync% libgnutls %sync% libsoup"
+  elif [ $pkg = "sisusb" ]
+  then
+    packages="$packages sisusbvga sisbit xsisusb"
+  else
+    packages="$packages $pkg"
+  fi
+done
+
+if [ $sync -eq 0 ]
+then
+    p=$packages
+    packages=""
+    for pkg in $p
+    do
+      if [ $pkg != "%sync%" ] ; then packages="$packages $pkg" ; fi
+    done
+fi
+
+echo $packages
+exit $status

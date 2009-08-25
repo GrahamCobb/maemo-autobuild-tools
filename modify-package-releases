@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# modify-package-releases <release> <packages>...
+#
+# <release> should be a release number in form <major>.<minor>-<debian-version>
+# or <major>.<minor>+[<debian-version>] (the latter indicates the date should be included in the package version)
+#
+# <packages> should be a list of package names
+#
+# Note that some package names are special:
+#
+#  GPE - this is turned into the list of packages that make up GPE
+#
+# NOTE: works inside or outside scratchbox environment
+#
+
+release=$1
+shift
+
+# Does the release end in a plus?
+if [ "$release" = "${release%+*}" ]
+then
+    # No, check it ends in a debian version
+    if [ "$release" = "${release%-*}" ]
+    then
+	echo "Release $release is not of the form <major>.<minor>-<debian-version> or <major>.<minor>+<debian-version>"
+	exit 2
+    fi
+fi
+
+cd `dirname $0`
+
+for pkg in `./expand-package-names "$@"`
+do
+    file=packages/$pkg.xml
+    echo "editing $file"
+    sed -i -e "/^[ \\t]*release=\"[-0-9.+]*\"\$/s/[-0-9.+][-0-9.+]*/$release/" $file
+done

@@ -40,11 +40,5 @@ export PATH=~/scratchbox/maemo:$PATH
 cmd=$1
 shift
 
-if [ ! -x ~/scratchbox/maemo/$cmd ]
-then
-  echo $0: script $cmd not found in ~/scratchbox/maemo/
-  exit 1
-fi
-
 exec ~/scratchbox/maemo/$cmd "$@"
 

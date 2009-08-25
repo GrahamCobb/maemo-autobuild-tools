@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# modify-package-dates <date> <packages>...
+#
+# <date> should be a date in any form 
+# <packages> should be a list of package names
+#
+# Note that some package names are special:
+#
+#  GPE - this is turned into the list of packages that make up GPE
+#
+# NOTE: works inside or outside scratchbox environment
+#
+
+date=`date -d "$1" +%Y%m%d`
+shift
+
+cd `dirname $0`
+
+for pkg in `./expand-package-names "$@"`
+do
+    file=packages/$pkg.xml
+    echo "editing $file"
+    sed -i -e "/^[ \\t]*date=\"[0-9]*\"\$/s/[0-9][0-9]*/$date/" $file
+done

@@ -1,0 +1,285 @@
+#!/bin/sh
+#
+# partial-weekly-build <packages>...
+#
+# <packages> should be a list of package names
+#
+# Note that some package names are special:
+#
+#  GPE - this is turned into the list of packages that make up GPE
+#
+# Options:
+#
+#   --target <environment>
+#
+#     Scratchbox target to use for the build (for example SDK_22_ARMEL)
+#
+#     If not specified, the build is run for each of SDK_22_ARMEL and
+#     SDK_31_ARMEL and SDK_40_ARMEL
+#
+#   --sdk <codename>
+#
+#     specify codename for sdk, to pass to MUD.
+#
+#     The default depends on which target is being used.
+#
+#   --dir <subdir>
+#
+#     subdirectory of ~/v/sb-qemu/ to use for log and upload/
+#
+#     The default depends on which target is being used.
+#
+#   --release <release>
+#
+#     release version id.  Default is to leave it unchanged in the package files
+#
+#     <release> should be a release number in form <major>.<minor>-<debian-version>
+#     or <major>.<minor>+ (the latter indicates the date should be included in the package version)
+#
+#   --date <date>
+#
+#     date to use for SVN fetches.  Default is "now"
+#
+#   --log <file>
+#
+#     logfile name.  Default depends on which SDK is being used
+#
+#   --repo <address> <distribution> <component>
+#
+#     repository information to add to apt sources list
+#
+#     Note that this option must be followed by exactly three arguments.
+#     This option can be specified more than once.  Each repository is added as two lines:
+#
+#     deb <address> <distribution> <component>
+#     deb-src <address> <distribution> <component>
+#
+#   --install <package>
+#
+#     install a package before starting the build
+#
+#     The package is installed using "apt-get install <package>".  The build continues
+#     if the installation fails.
+#
+#     This option can be specified more than once.
+#
+#   --dist <dir>
+#
+#     distribution directory to use.  Default depends on which SDK is being used
+#
+#   --arch <arch>
+#
+#     architecture name for binary distribution directory.  Default depends on which SDK is being used
+#
+#   --quiet
+#
+#     do not show emulator log on stdout.  This is useful when building in cron
+#     so the mail is not multi-megabytes!
+#
+#   --invoke qemu | uml | sbox | sbdmock
+#
+#     uml is the default
+#
+#   --uml NN
+#
+#     uml instance number.  Default is 04
+#
+#   --linux command
+#
+#     uml command -- default is "linux"
+#
+# The upload directory is emptied and the packages are built using today's date
+#
+# NOTE: must not be in scratchbox environment
+#
+
+# Make sure all builds use the same date
+date=`date -d now +%Y%m%d`
+
+env=""
+dir=""
+opts=""
+log=""
+dist=""
+arch=""
+sdk=""
+emulator="./uml-sb-build.sh"
+uml="04"
+quiet=0
+while [ "${1:0:1}" = "-" ]
+do
+  if [ "$1" = "--target" ]
+      then
+      env=$2
+      shift 2
+  elif [ "$1" = "--dir" ]
+      then
+      dir=$2
+      shift 2
+  elif [ "$1" = "--sdk" ]
+      then
+      sdk=$2
+      shift 2
+  elif [ "$1" = "--release" ]
+      then
+      opts="$opts $1 $2"
+      shift 2
+  elif [ "$1" = "--date" ]
+      then
+      date=$2
+      shift 2
+  elif [ "$1" = "--repo" ]
+      then
+      opts="$opts $1 $2 $3 $4"
+      shift 4
+  elif [ "$1" = "--install" ]
+      then
+      opts="$opts $1 $2"
+      shift 2
+  elif [ "$1" = "--log" ]
+      then
+      log=$2
+      shift 2
+  elif [ "$1" = "--dist" ]
+      then
+      dist=$2
+      shift 2
+  elif [ "$1" = "--arch" ]
+      then
+      arch=$2
+      shift 2
+  elif [ "$1" = "--quiet" ]
+      then
+      quiet=1
+      shift
+  elif [ "$1" = "--invoke" ]
+      then
+      if [ "$2" = "uml" ]
+	  then
+	  emulator="./uml-sb-build.sh"
+      elif [ "$2" = "qemu" ]
+	  then
+	  emulator="./qemu-sb-build.sh"
+      elif [ "$2" = "sbox" ]
+	  then
+	  emulator="./sbox-sb-build.sh"
+      elif [ "$2" = "sbdmock" ]
+	  then
+	  emulator="./sbdmock-sb-build.sh"
+      else
+	  echo "$0: Unrecognised --invoke option: $2"
+	  exit 1
+      fi
+      shift 2
+  elif [ "$1" = "--uml" ]
+      then
+      uml=$2
+      shift 2
+  elif [ "$1" = "--linux" ]
+      then
+      opts="$opts $1 $2"
+      shift 2
+  else
+      echo "$0: Unrecognised option: $1"
+      exit 1
+  fi
+done
+
+cd `dirname $0`
+
+# If no environment is specified, run all
+if [ -z "$env" ]
+then
+    [ -z "$dir" ] || opts="$opts --dir $dir"
+    [ -z "$log" ] || opts="$opts --log $log"
+    [ -z "$sdk" ] || opts="$opts --sdk $sdk"
+    ./`basename $0` --target SDK_22_ARMEL --date $date $opts "$@"
+    ./`basename $0` --target SDK_30_ARMEL --date $date $opts "$@"
+    ./`basename $0` --target SDK_40_ARMEL --date $date $opts "$@"
+    ./`basename $0` --target SDK_22_I386 --date $date $opts "$@"
+    ./`basename $0` --target SDK_30_I386 --date $date $opts "$@"
+    ./`basename $0` --target SDK_40_I386 --date $date $opts "$@"
+    exit 0
+fi
+
+# Number of .deb's expecting:
+expected=`./expected "$@"`
+
+# Default directory and log
+if [ -z "${env##SDK_50*}" ]
+  then
+    [ -z "$dir" ] && dir="partial-weekly-IT2009"
+    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2009.log"
+    [ -z "$dist" ] && dist="fremantle"
+    [ -z "$sdk" ] && sdk="fremantle"
+fi
+if [ -z "${env##SDK_41*}" ]
+  then
+    [ -z "$dir" ] && dir="partial-weekly-IT2008"
+    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2008.log"
+    [ -z "$dist" ] && dist="diablo"
+    [ -z "$sdk" ] && sdk="diablo"
+fi
+if [ -z "${env##SDK_40*}" ]
+  then
+    [ -z "$dir" ] && dir="partial-weekly-IT2008"
+    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2008.log"
+    [ -z "$dist" ] && dist="chinook"
+    [ -z "$sdk" ] && sdk="chinook"
+fi
+if [ -z "${env##SDK_3*}" ]
+  then
+    [ -z "$dir" ] && dir="partial-weekly-IT2007"
+    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2007.log"
+    [ -z "$dist" ] && dist="bora"
+    [ -z "$sdk" ] && sdk="bora"
+fi
+if [ -z "${env##SDK_22*}" ]
+  then
+    [ -z "$dir" ] && dir="partial-weekly-IT2006"
+    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2006.log"
+    [ -z "$dist" ] && dist="gregale"
+    [ -z "$sdk" ] && sdk="gregale"
+fi
+if [ -z "${env##SDK_20*}" ]
+  then
+    [ -z "$dir" ] && dir="partial-weekly-IT2005"
+    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2005.log"
+    [ -z "$dist" ] && dist="mistral"
+    [ -z "$sdk" ] && sdk="mistral"
+fi
+if [ -z "${env##*X86}" ] || [ -z "${env##*I386}" ]
+  then
+    [ -z "$arch" ] && arch="i386"
+fi
+if [ -z "${env##*ARMEL}" ]
+  then
+    [ -z "$arch" ] && arch="armel"
+fi
+if [ -z "$dir" ] || [ -z "$log" ] || [ -z "$sdk" ]
+    then
+    echo "Unrecognised SDK $env: --sdk, --dir, --arch and --log must be specified"
+    exit
+fi
+
+[ -d ../sb-qemu/$dir ] || mkdir ../sb-qemu/$dir/
+rm ../sb-qemu/$dir/upload/*
+rm ../sb-qemu/$dir/qemu-build.log
+
+echo $emulator --date $date --dir $dir --sdk $sdk --target $env --expected $expected \
+    --uml $uml --repo http://repository.maemo.org/extras-devel/ $dist free $opts "$@" 
+time $emulator --date $date --dir $dir --sdk $sdk --target $env --expected $expected \
+    --uml $uml --repo http://repository.maemo.org/extras-devel/ $dist free $opts "$@" 2>&1 |
+ if [ $quiet -eq 0 ] ; then tee $log ; else cat >$log ; fi
+
+# Check we have got what we expected
+num=`ls -1 ../sb-qemu/$dir/upload/*.deb | wc -l`
+if [ $expected -eq 0 -o $num -ne $expected ]
+then
+    echo "*** $env build for $* failed: expected $expected packages but got $num"
+#    echo "Logfile is `pwd`/$log"
+    echo "Logfile is `pwd`/../sb-qemu/$dir/qemu-build.log"
+    ls ../sb-qemu/$dir/upload/*.deb
+else
+    echo "$env build for $* completed: found $num packages as expected"
+fi

@@ -1,0 +1,4 @@
+#!/bin/sh
+echo test-refer has run
+echo \$0 = $0
+echo \$* = $*

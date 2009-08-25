@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# Add a new SDK to package files
+#
+# This is for adding new SDK lines into package files, defaulting to the
+# contents of lines for an existing sdk.
+#
+# add-sdk <existing-sdk-name> <new-sdk-name> [<files>...]
+#
+# This script goes through all the specified files
+# (or packages/*.xml if not specified) and for every
+# line which contains:
+#
+#    sdk="<existing-sdk-name>"
+#
+# it adds an identical line with:
+#
+#    sdk="<new-sdk-name>"
+#
+# Note: the existing-sdk-name lines are retained, new lines are just added.
+#
+
+old=$1
+new=$2
+shift 2
+if [ -z "$old" -o -z "$new" ]
+then
+	echo Existing and new SDK names must be specified.
+	echo Usage: $0 "<existing-sdk-name> <new-sdk-name> [<files>...]"
+	exit 1
+fi
+
+if [ "$#" -eq 0 ]
+then
+	files="packages/*.xml"
+else
+	files="$@"
+fi
+
+for f in $files
+do
+	[ -f $f.add-sdk ] && rm -f $f.add-sdk
+
+	if awk -v old=$old -v new=$new '
+BEGIN {count=0}
+
+{ print $0 }
+
+$0 ~ ("sdk=\"" old "\"") {
+	sub(/sdk="[^"]*"/, "sdk=\"" new "\"")
+	print $0
+	count++
+}
+
+END {if (count == 0) {exit 1}}
+' $f >$f.add-sdk
+	then
+		mv -f $f.add-sdk $f
+	fi 
+done

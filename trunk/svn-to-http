@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# svn-to-http <packages>...
+#
+# <packages> should be a list of package names
+#
+# Note that some package names are special:
+#
+#  GPE - this is turned into the list of packages that make up GPE
+#
+
+cd ~/mud-builder
+
+this="../v/mud-builder/`basename $0`"
+
+for pkg in `./expand-package-names "$@"`
+do
+    file=packages/$pkg.xml
+    echo "editing $file"
+    sed -i -e "s/svn:/http:/" $file
+done

@@ -1,0 +1,124 @@
+#!/bin/sh
+#
+# Shell script to output the number of .deb's expected to be built for
+# list of packages provided as parameters.
+#
+# Note that duplicates in the package list are tolerated and only
+# count once in the total.
+#
+
+#
+# NOTE: This script works both inside and ouotside scratchbox 
+#
+
+# We use three arrays where the three array values for any particular index correspond to one package
+#   pkg_name - package name
+#   pkg_expect - number of deb's built for that package
+#   pkg_seen - flag to track of the package needs to be counted
+
+# Used when we can't find the package...
+pkg_name[0]=""
+pkg_expect[0]=0
+pkg_seen[0]=0
+
+index=1
+# First we need to create the arrays
+# assign <package> <number>
+function assign () {
+ pkg_name[$index]=$1
+ pkg_expect[$index]=$2
+ pkg_seen[$index]=0
+ index=$((index+1))
+}
+assign dbus-scripts 1
+assign fam 4
+assign libcompress-zlib-perl 1
+assign libopencdk8 3
+#assign libopensync 3
+#assign libopensync-plugin-file 1
+#assign libopensync-plugin-gpe 1
+#assign libopensync-plugin-syncml 1
+#assign libsyncml 4
+assign libtasn1 4
+#assign libwbxml 4
+#assign msynctool 2
+#assign opensync 4
+assign tinc 1
+assign gnome-common 1
+assign gpe-calendar 1
+assign gpe-contacts 1
+assign gpe-filemanager 1
+assign gpe-icons 1
+assign gpesyncd 1
+assign gpe-timesheet 1
+assign gpe-todo 1
+assign libcontactsdb 2
+assign libeventdb 2
+assign libgpepimc 2
+assign libgpevtype 2
+assign libgpewidget 2
+assign libhandoff 2
+assign libmimedir-gnome 2
+assign libschedule 2
+assign libsoundgen 2
+assign libsqlite0 3
+assign libtododb 2
+assign libxsettings-client 2
+assign starling 1
+assign gpesummary 1
+assign cmake 1
+assign quilt 1
+assign libopensync 2
+assign msynctool 1
+assign osynctool 1
+assign opensync-format-plugin-vformat 1
+assign opensync-format-plugin-xmlformat 1
+assign opensync-plugin-file 1
+assign opensync-plugin-gpe 1
+assign libwbxml2 2
+assign libsyncml 3
+assign opensync-plugin-syncml 1
+assign libsoup 2
+assign libgnutls 4
+assign libtasn1-3 4
+assign libopencdk 3
+assign libopenobex 2
+assign sisusbvga 1
+assign sisbit 1
+assign xsisusb 2
+
+# Now mark the ones we are including
+
+# Function to find a package index: lookup <package>
+function lookup () {
+  for (( i=0 ; $i < ${#pkg_name[*]} ; i++ ))
+  do
+    if [ "${pkg_name[$i]}" = "$1" ]
+    then
+      echo $i
+      return
+    fi
+  done
+  echo "Package $1 not found" >&2
+  echo 0
+}
+
+for pkg in `./expand-package-names "$@"`
+do
+  i=`lookup $pkg`
+#  echo "We saw package $i" >&2
+  pkg_seen[$i]=1
+done
+
+# Now work out the total
+e=0
+for (( i=0 ; $i < ${#pkg_name[*]} ; i++ ))
+do
+  if [ "${pkg_seen[$i]}" != 0 ]
+  then
+#    echo "Add: ${pkg_name[$i]} = ${pkg_expect[$i]}" >&2
+    e=$(($e + ${pkg_expect[$i]}))
+  fi
+done
+
+echo $e

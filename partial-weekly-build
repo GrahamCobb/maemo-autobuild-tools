@@ -96,6 +96,8 @@
 # Make sure all builds use the same date
 date=`date -d now +%Y%m%d`
 
+OUTDIR=~/scratchbox/v
+
 env=""
 dir=""
 opts=""
@@ -209,42 +211,42 @@ expected=`./expected "$@"`
 if [ -z "${env##SDK_50*}" ]
   then
     [ -z "$dir" ] && dir="partial-weekly-IT2009"
-    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2009.log"
+    [ -z "$log" ] && log="$OUTDIR/sb-qemu/$dir/partial-weekly-IT2009.log"
     [ -z "$dist" ] && dist="fremantle"
     [ -z "$sdk" ] && sdk="fremantle"
 fi
 if [ -z "${env##SDK_41*}" ]
   then
     [ -z "$dir" ] && dir="partial-weekly-IT2008"
-    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2008.log"
+    [ -z "$log" ] && log="$OUTDIR/sb-qemu/$dir/partial-weekly-IT2008.log"
     [ -z "$dist" ] && dist="diablo"
     [ -z "$sdk" ] && sdk="diablo"
 fi
 if [ -z "${env##SDK_40*}" ]
   then
     [ -z "$dir" ] && dir="partial-weekly-IT2008"
-    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2008.log"
+    [ -z "$log" ] && log="$OUTDIR/sb-qemu/$dir/partial-weekly-IT2008.log"
     [ -z "$dist" ] && dist="chinook"
     [ -z "$sdk" ] && sdk="chinook"
 fi
 if [ -z "${env##SDK_3*}" ]
   then
     [ -z "$dir" ] && dir="partial-weekly-IT2007"
-    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2007.log"
+    [ -z "$log" ] && log="$OUTDIR/sb-qemu/$dir/partial-weekly-IT2007.log"
     [ -z "$dist" ] && dist="bora"
     [ -z "$sdk" ] && sdk="bora"
 fi
 if [ -z "${env##SDK_22*}" ]
   then
     [ -z "$dir" ] && dir="partial-weekly-IT2006"
-    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2006.log"
+    [ -z "$log" ] && log="$OUTDIR/sb-qemu/$dir/partial-weekly-IT2006.log"
     [ -z "$dist" ] && dist="gregale"
     [ -z "$sdk" ] && sdk="gregale"
 fi
 if [ -z "${env##SDK_20*}" ]
   then
     [ -z "$dir" ] && dir="partial-weekly-IT2005"
-    [ -z "$log" ] && log="../sb-qemu/$dir/partial-weekly-IT2005.log"
+    [ -z "$log" ] && log="$OUTDIR/sb-qemu/$dir/partial-weekly-IT2005.log"
     [ -z "$dist" ] && dist="mistral"
     [ -z "$sdk" ] && sdk="mistral"
 fi
@@ -262,9 +264,9 @@ if [ -z "$dir" ] || [ -z "$log" ] || [ -z "$sdk" ]
     exit
 fi
 
-[ -d ../sb-qemu/$dir ] || mkdir ../sb-qemu/$dir/
-rm ../sb-qemu/$dir/upload/*
-rm ../sb-qemu/$dir/qemu-build.log
+[ -d $OUTDIR/sb-qemu/$dir ] || mkdir $OUTDIR/sb-qemu/$dir/
+rm $OUTDIR/sb-qemu/$dir/upload/*
+rm $OUTDIR/sb-qemu/$dir/qemu-build.log
 
 echo $emulator --date $date --dir $dir --sdk $sdk --target $env --expected $expected \
     --uml $uml --repo http://repository.maemo.org/extras-devel/ $dist free $opts "$@" 
@@ -273,13 +275,12 @@ time $emulator --date $date --dir $dir --sdk $sdk --target $env --expected $expe
  if [ $quiet -eq 0 ] ; then tee $log ; else cat >$log ; fi
 
 # Check we have got what we expected
-num=`ls -1 ../sb-qemu/$dir/upload/*.deb | wc -l`
+num=`ls -1 $OUTDIR/sb-qemu/$dir/upload/*.deb | wc -l`
 if [ $expected -eq 0 -o $num -ne $expected ]
 then
     echo "*** $env build for $* failed: expected $expected packages but got $num"
-#    echo "Logfile is `pwd`/$log"
-    echo "Logfile is `pwd`/../sb-qemu/$dir/qemu-build.log"
-    ls ../sb-qemu/$dir/upload/*.deb
+    echo "Logfile is $OUTDIR/sb-qemu/$dir/qemu-build.log"
+    ls $OUTDIR/sb-qemu/$dir/upload/*.deb
 else
     echo "$env build for $* completed: found $num packages as expected"
 fi

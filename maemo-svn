@@ -30,7 +30,7 @@
 
 if [ -d ~/scratchbox/maemo ]
 then
-  svn update ~/scratchbox/maemo
+  svn update --quiet ~/scratchbox/maemo
 else
   svn checkout svn://svn.cobb.me.uk/maemo/trunk ~/scratchbox/maemo
 fi

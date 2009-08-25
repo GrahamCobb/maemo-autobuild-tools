@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Perform a Maemo build using Graham's build environment
+#
+# This build environment makes some assumptions:
+#
+# 1) This script is running outside the scratchbox environment.
+#
+# 2) Subversion is installed and the svn://svn.cobb.me.uk
+# repository is accessible.
+#
+# 3) The directory "~/scratchbox" points to the user's scratchbox
+# home directory (this may be a soft or hard link or a mount point).
+# In other words the file "~/scratchbox/a" can be referenced within
+# scratchbox as "~/a".
+#
+# 4) Build output will go into a directory called "~/scratchbox/v/sb-qemu/"
+# (or "~/v/sb-qemu/" inside the scratchbox environment).  That directory must
+# be writeable.
+#
+# 5) If "~/scratchbox/maemo/" exists, it is a subversion working copy of
+# svn://svn.cobb.me.uk/maemo/trunk.  If it doesn't exist it can be set up
+# that way.
+#
+# This script sets up ~/scratchbox/maemo/ and then adds it to the PATH.
+# It then treats its arguments as a command to be executed.  The first 
+# argument must be the name of a script within the ~/scratchbox/maemo/
+# directory.
+#
+
+if [ -d ~/scratchbox/maemo ]
+then
+  svn update ~/scratchbox/maemo
+else
+  svn checkout svn://svn.cobb.me.uk/maemo/trunk ~/scratchbox/maemo
+fi
+
+export PATH=~/scratchbox/maemo:$PATH
+
+cmd=$1
+shift
+
+if [ ! -x ~/scratchbox/maemo/$cmd ]
+then
+  echo $0: script $cmd not found in ~/scratchbox/maemo/
+  exit 1
+fi
+
+exec ~/scratchbox/maemo/$cmd "$@"
+

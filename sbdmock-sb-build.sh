@@ -75,6 +75,8 @@
 #
 # The upload directory is emptied and the packages are built using the specified date
 #
+# NOTE: this script assumes sbdmock is installed in ~/scratchbox/sbdmock/bin/sbdmock
+#
 
 setup=""
 env=""
@@ -177,7 +179,7 @@ fi
 # Scratchbox needs $USER defined but cron only defines LOGNAME
 [ -z "$USER" ] && export USER=$LOGNAME
 
-echo ~/scratchbox/v/sbdmock/bin/sbdmock -r $config -c -- maemo/qemu-build $opts "$@"
+echo ~/scratchbox/sbdmock/bin/sbdmock -r $config -c -- maemo/qemu-build $opts "$@"
 
-~/scratchbox/v/sbdmock/bin/sbdmock -r $config -c -- maemo/qemu-build $opts "$@"
+~/scratchbox/sbdmock/bin/sbdmock -r $config -c -- maemo/qemu-build $opts "$@"
 

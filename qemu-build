@@ -76,24 +76,12 @@
 #     2) install all packages lying around in mud-builder/upload
 #     3) invokes mud with the --depend-nobuild option
 #
-#   --dont-copy (must be first option)
-#
-#     do not copy the script and exec the copy.  Not normally specified by hand,
-#     this option is used internally once the copy has happened
-#
 # The upload directory is emptied and the packages are built using the specified date
 #
-# NOTE: must be in scratchbox environment
+# NOTE: must be in scratchbox environment.
 #
-
-if [ "$1" != "--dont-copy" ]
-then
-    echo Copying script...
-    cp ~/v/qemu-build ~/
-    exec ~/qemu-build --dont-copy "$@"
-else
-    shift
-fi
+# NOTE: all output files go in ~/v/sb-qemu... (see --target)
+#
 
 # Save qemu output
 fifo=`tempfile`
@@ -103,6 +91,13 @@ mkfifo $fifo
 exec >$fifo 2>&1
 
 echo "$0 started at `date`"
+
+# Remember where the scripts live
+export SCRIPTS=`dirname $0`
+if [ "${SCRIPTS:0:1}" != "/" -a "${SCRIPTS:0:1}" != "~" ]
+then
+  SCRIPTS=`pwd`/$SCRIPTS
+fi
 
 target=""
 release=""
@@ -237,7 +232,7 @@ cd ~/mud-builder
 #
 # Bring mud up to date
 #
-#patch -N -p0 <~/v/mud-builder/field-match.patch
+#patch -N -p0 <$SCRIPTS/field-match.patch
 
 #
 # Package files
@@ -248,21 +243,11 @@ cd ~/mud-builder
 [ -f packages/guile-1.8.xml ] || patch -N -p0 <~/v/mud-builder/packages.patch
 
 #
-# Copy files so things don't change during the build
-#
-cp ~/v/mud-builder/expand-package-names ~/mud-builder/
-cp ~/v/mud-builder/modify-package-dates ~/mud-builder/
-cp ~/v/mud-builder/modify-package-releases ~/mud-builder/
-#cp ~/v/mud-builder/svn-to-http ~/mud-builder/
-cp ~/v/mud-builder/full-build ~/mud-builder/
-cp ~/v/mud-builder/expected ~/mud-builder/
-
-#
 # Calculate expected number of .debs
 #
 if [ $expected -eq 0 ]
 then
-  expected=`~/mud-builder/expected "$@"`
+  expected=`$SCRIPTS/expected "$@"`
 fi
 
 #
@@ -270,11 +255,10 @@ fi
 #
 rm ~/mud-builder/downloads/*
 
-#cp ~/v/mud-builder/svn-to-http ./
-#./svn-to-http "$@"
+#$SCRIPTS/svn-to-http "$@"
 
 # Fixup releases
-[ -z "$release" ] || ~/mud-builder/modify-package-releases $release "$@"
+[ -z "$release" ] || $SCRIPTS/modify-package-releases $release "$@"
 
 # Remove obsolete packages
 if [ $clean -ne 0 ]
@@ -304,7 +288,7 @@ then
 fi
 
 # Install previous packages
-[ -z "$cont" ] || fakeroot dpkg -i --force-depends mud-builder/upload/*.deb
+[ -z "$cont" ] || fakeroot dpkg -i --force-depends ~/mud-builder/upload/*.deb
 [ -z "$cont" ] || fakeroot dpkg -i --force-depends ~/v/sb-qemu$target/upload/*.deb
 
 [ -f ~/mud-builder/build/sources.list ] && rm ~/mud-builder/build/sources.list
@@ -324,9 +308,9 @@ function dpkg-depcheck { perl /usr/bin/dpkg-depcheck "$@" ; } ; export -f dpkg-d
 
 # HACK to make dpkg-parsechangelog work on buggy systems
 # Can be removed once UML bisect is done
-#function dpkg-parsechangelog { perl $HOME/mud-builder/dpkg-parsechangelog "$@" ; } ; export -f dpkg-parsechangelog
+#function dpkg-parsechangelog { perl $SCRIPTS/dpkg-parsechangelog "$@" ; } ; export -f dpkg-parsechangelog
 mkdir ~/mud-builder/pcn-hack
-cp ~/v/mud-builder/dpkg-parsechangelog ~/mud-builder/pcn-hack
+cp $SCRIPTS/dpkg-parsechangelog ~/mud-builder/pcn-hack
 echo exit >~/mud-builder/pcn-hack/sleep
 chmod +x ~/mud-builder/pcn-hack/sleep
 export PATH=$HOME/mud-builder/pcn-hack:$PATH
@@ -342,8 +326,8 @@ mkdir -p ~/v/sb-qemu$target
 
 # Do the build
 # LD_BIND_NOW is to workround a ld.so bug which causes program execution to sometimes fail
-#LD_BIND_NOW=1 ./full-build $cont $date "$@" 2>&1 | tee ~/v/sb-qemu$target/qemu-build.log
-~/mud-builder/full-build $sdk $cont $date "$@" 2>&1 | 
+#LD_BIND_NOW=1 $SCRIPTS/full-build $cont $date "$@" 2>&1 | tee ~/v/sb-qemu$target/qemu-build.log
+$SCRIPTS/full-build $sdk $cont $date "$@" 2>&1 | 
  if [ $quiet -eq 0 ] ; then tee ~/v/sb-qemu$target/qemu-build.log ; else cat >~/v/sb-qemu$target/qemu-build.log ; fi
 
 [ -n "$cont" ] || rm ~/v/sb-qemu$target/upload/*

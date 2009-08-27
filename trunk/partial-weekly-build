@@ -88,6 +88,11 @@
 #
 #     uml command -- default is "linux"
 #
+#   --expected <n>
+#
+#     Override the automatically calculated number of expected packages.
+#     Default is 0, which causes the number to be calculated automatically.
+#
 # The upload directory is emptied and the packages are built using today's date
 #
 # NOTE: must not be in scratchbox environment
@@ -98,6 +103,13 @@ date=`date -d now +%Y%m%d`
 
 OUTDIR=~/scratchbox/v
 
+# Remember where the scripts live
+export SCRIPTS=`dirname $0`
+if [ "${SCRIPTS:0:1}" != "/" -a "${SCRIPTS:0:1}" != "~" ]
+then
+  SCRIPTS=`pwd`/$SCRIPTS
+fi
+
 env=""
 dir=""
 opts=""
@@ -105,9 +117,10 @@ log=""
 dist=""
 arch=""
 sdk=""
-emulator="./uml-sb-build.sh"
+emulator="$SCRIPTS/uml-sb-build.sh"
 uml="04"
 quiet=0
+expected=0
 while [ "${1:0:1}" = "-" ]
 do
   if [ "$1" = "--target" ]
@@ -158,16 +171,16 @@ do
       then
       if [ "$2" = "uml" ]
 	  then
-	  emulator="./uml-sb-build.sh"
+	  emulator="$SCRIPTS/uml-sb-build.sh"
       elif [ "$2" = "qemu" ]
 	  then
-	  emulator="./qemu-sb-build.sh"
+	  emulator="$SCRIPTS/qemu-sb-build.sh"
       elif [ "$2" = "sbox" ]
 	  then
-	  emulator="./sbox-sb-build.sh"
+	  emulator="$SCRIPTS/sbox-sb-build.sh"
       elif [ "$2" = "sbdmock" ]
 	  then
-	  emulator="./sbdmock-sb-build.sh"
+	  emulator="$SCRIPTS/sbdmock-sb-build.sh"
       else
 	  echo "$0: Unrecognised --invoke option: $2"
 	  exit 1
@@ -180,6 +193,10 @@ do
   elif [ "$1" = "--linux" ]
       then
       opts="$opts $1 $2"
+      shift 2
+  elif [ "$1" = "--expected" ]
+      then
+      expected=$2
       shift 2
   else
       echo "$0: Unrecognised option: $1"
@@ -195,17 +212,17 @@ then
     [ -z "$dir" ] || opts="$opts --dir $dir"
     [ -z "$log" ] || opts="$opts --log $log"
     [ -z "$sdk" ] || opts="$opts --sdk $sdk"
-    ./`basename $0` --target SDK_22_ARMEL --date $date $opts "$@"
-    ./`basename $0` --target SDK_30_ARMEL --date $date $opts "$@"
-    ./`basename $0` --target SDK_40_ARMEL --date $date $opts "$@"
-    ./`basename $0` --target SDK_22_I386 --date $date $opts "$@"
-    ./`basename $0` --target SDK_30_I386 --date $date $opts "$@"
-    ./`basename $0` --target SDK_40_I386 --date $date $opts "$@"
+    $SCRIPTS/`basename $0` --target SDK_22_ARMEL --date $date $opts "$@"
+    $SCRIPTS/`basename $0` --target SDK_30_ARMEL --date $date $opts "$@"
+    $SCRIPTS/`basename $0` --target SDK_40_ARMEL --date $date $opts "$@"
+    $SCRIPTS/`basename $0` --target SDK_22_I386 --date $date $opts "$@"
+    $SCRIPTS/`basename $0` --target SDK_30_I386 --date $date $opts "$@"
+    $SCRIPTS/`basename $0` --target SDK_40_I386 --date $date $opts "$@"
     exit 0
 fi
 
 # Number of .deb's expecting:
-expected=`./expected "$@"`
+if [ $expected -eq 0 ] ; then expected=`$SCRIPTS/expected "$@"` ; fi
 
 # Default directory and log
 if [ -z "${env##SDK_50*}" ]

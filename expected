@@ -86,6 +86,8 @@ assign libopenobex 2
 assign sisusbvga 1
 assign sisbit 1
 assign xsisusb 2
+assign libaudiofile 3
+assign libesd 2
 
 # Now mark the ones we are including
 

@@ -198,6 +198,7 @@ fakeroot apt-get --yes install build-essential
 fakeroot apt-get --yes install devscripts
 fakeroot apt-get --yes install xsltproc
 fakeroot apt-get --yes install sharutils
+fakeroot apt-get --yes install maemo-optify
 
 #
 # Create mud-builder directory

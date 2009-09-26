@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# add-optify <packages>...
+#
+# <packages> should be a list of package names
+#
+# Note that some package names are special:
+#
+#  GPE - this is turned into the list of packages that make up GPE
+#
+# NOTE: works inside or outside scratchbox environment but current
+# directory must be mud-builder directory
+#
+
+# Remember where the scripts live
+export SCRIPTS=`dirname $0`
+if [ "${SCRIPTS:0:1}" != "/" -a "${SCRIPTS:0:1}" != "~" ]
+then
+  SCRIPTS=`pwd`/$SCRIPTS
+fi
+
+for pkg in `$SCRIPTS/expand-package-names "$@"`
+do
+    file=packages/$pkg.xml
+    echo "editing $file"
+    sed -i -e "/optify/s/[[:space:]]*optify=\"[[:digit:]]*\"//" $file
+    sed -i -e "/<deb[ >]/s/<deb/<deb optify=\"1\"/" $file
+done

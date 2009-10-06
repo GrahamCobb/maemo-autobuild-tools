@@ -146,6 +146,10 @@ if [ -z "${env##SDK_50*}" ]
   then
   config="maemo-fremantle"
 fi
+if [ -z "${env##SDK_50_BETA2*}" ]
+  then
+  config="maemo-fremantle-beta2"
+fi
 if [ -z "${env##SDK_41*}" ]
   then
   config="maemo-diablo"

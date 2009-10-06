@@ -165,6 +165,15 @@ done
 echo "APT::Get::AllowUnauthenticated 1 ;" >>/etc/apt/apt.conf
 
 #
+# Fremantle /opt hack
+#
+if [ ! -d /targets/$target/opt ]
+then
+    rm /targets/$target/opt
+    mkdir /targets/$target/opt
+fi
+
+#
 # Add additional repositories
 #
 for r in "${repos[@]}"

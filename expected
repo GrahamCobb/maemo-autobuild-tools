@@ -88,6 +88,8 @@ assign sisbit 1
 assign xsisusb 2
 assign libaudiofile 3
 assign libesd 2
+assign mhash 2
+assign proxytunnel 1
 
 # Now mark the ones we are including
 

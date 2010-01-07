@@ -167,10 +167,11 @@ echo "APT::Get::AllowUnauthenticated 1 ;" >>/etc/apt/apt.conf
 #
 # Fremantle /opt hack
 #
-if [ ! -d /targets/$target/opt ]
+targetopt=`readlink /targets/links/opt`
+if [ ! -d $targetopt ]
 then
-    rm /targets/$target/opt
-    mkdir /targets/$target/opt
+    rm $targetopt
+    mkdir $targetopt
 fi
 
 #

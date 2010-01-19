@@ -239,7 +239,7 @@ V 28
 https://garage.maemo.org:443
 END
 EOF
-svn export --non-interactive --quiet --force https://garage.maemo.org/svn/mud-builder/trunk ~/mud-builder
+svn export --non-interactive --quiet --force https://vcs.maemo.org/svn/mud-builder/trunk ~/mud-builder
 
 [ -d ~/mud-builder ] || ( echo "MUD download failed!!!!" ; exit 1 )
 

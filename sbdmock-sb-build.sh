@@ -183,6 +183,9 @@ fi
 # Scratchbox needs $USER defined but cron only defines LOGNAME
 [ -z "$USER" ] && export USER=$LOGNAME
 
+sb-conf killall
+sb-conf killall --signal=9
+
 echo ~/scratchbox/sbdmock/bin/sbdmock -r $config -c -- maemo/qemu-build $opts "$@"
 
 ~/scratchbox/sbdmock/bin/sbdmock -r $config -c -- maemo/qemu-build $opts "$@"
